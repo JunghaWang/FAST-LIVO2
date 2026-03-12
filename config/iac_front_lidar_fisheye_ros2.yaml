@@ -1,0 +1,136 @@
+laserMapping:
+  ros__parameters:
+    common:
+      lid_topic: "/front/pcl_common_layer"
+      imu_topic: "/novatel_bottom/rawimux"
+      img_topic: "/camera/fisheye_front/image/compressed"
+      img_compressed: true
+      img_en: 1
+      lidar_en: 1
+      ros_driver_bug_fix: false
+
+    # QoS is parameterized. Use FAST-LIVO2 SensorDataQoS profile defaults first.
+    qos:
+      lidar:
+        profile: "sensor_data"
+        history: "keep_last"
+        depth: 2000
+      imu:
+        profile: "sensor_data"
+        history: "keep_last"
+        depth: 2000
+      image:
+        profile: "sensor_data"
+        history: "keep_last"
+        depth: 100
+
+    # Camera model parameters used by vikit camera classes
+    camera:
+      cam_model: "Pinhole"
+      cam_width: 2064
+      cam_height: 572
+      scale: 1.0
+      cam_fx: 1035.2292843269067
+      cam_fy: 1041.1788359826517
+      cam_cx: 1042.7452595641203
+      cam_cy: 208.58481378160025
+      cam_d0: 0.0
+      cam_d1: 0.0
+      cam_d2: 0.0
+      cam_d3: 0.0
+
+    extrin_calib:
+      # T_lidar_imu from GLIM config_sensors.json (front lidar)
+      extrinsic_T: [-0.586, 0.070, -0.549]
+      extrinsic_R: [1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0]
+      # T_lidar_camera from GLIM fisheye_front setup
+      Pcl: [-0.857, -0.005, 0.275]
+      # Quaternion (-0.5, 0.5, -0.5, 0.5) -> rotation matrix
+      Rcl: [0.0, 0.0, 1.0,
+            -1.0, 0.0, 0.0,
+            0.0, -1.0, 0.0]
+
+    time_offset:
+      imu_time_offset: 0.0
+      # IAC camera header stamp is in a different epoch than lidar/imu.
+      # Align camera timestamp base to lidar/imu time domain.
+      img_time_offset: 1747321641.6365292
+      exposure_time_init: 0.0
+
+    preprocess:
+      # Use generic PointCloud2 parser path for IAC point cloud
+      lidar_type: 1
+      scan_line: 64
+      scan_rate: 20
+      point_filter_num: 2
+      filter_size_surf: 0.2
+      blind: 0.8
+      feature_extract_enabled: false
+      intensity_field: "reflectance"
+      time_field: "timestamp"
+      time_scale_to_ms: 0.000001
+
+    imu:
+      imu_en: true
+      imu_int_frame: 30
+      acc_cov: 0.5
+      gyr_cov: 0.3
+      gravity_est_en: true
+      ba_bg_est_en: true
+
+    vio:
+      max_iterations: 5
+      outlier_threshold: 800
+      img_point_cov: 100
+      patch_size: 8
+      patch_pyrimid_level: 4
+      normal_en: true
+      raycast_en: false
+      inverse_composition_en: false
+      exposure_estimate_en: true
+      inv_expo_cov: 0.1
+      grid_size: 5
+      grid_n_height: 17
+
+    lio:
+      max_iterations: 5
+      dept_err: 0.02
+      beam_err: 0.05
+      min_eigen_value: 0.0025
+      voxel_size: 0.5
+      max_layer: 2
+      max_points_num: 50
+      layer_init_num: [5, 5, 5, 5, 5]
+
+    local_map:
+      map_sliding_en: false
+      half_map_size: 100
+      sliding_thresh: 8.0
+
+    uav:
+      imu_rate_odom: false
+      gravity_align_en: false
+
+    publish:
+      dense_map_en: true
+      pub_effect_point_en: false
+      pub_plane_en: false
+      pub_scan_num: 1
+      blind_rgb_points: 0.01
+
+    evo:
+      seq_name: "IAC_FAST_LIVO2"
+      pose_output_en: false
+
+    pcd_save:
+      pcd_save_en: true
+      type: 0
+      colmap_output_en: false
+      filter_size_pcd: 0.2
+      interval: -1
+
+    debug:
+      plot_time: -10.0
+      frame_cnt: 6

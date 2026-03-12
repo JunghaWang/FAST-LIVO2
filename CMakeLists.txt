@@ -1,147 +1,164 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.16)
 project(fast_livo)
 
 set(CMAKE_BUILD_TYPE "Release")
-message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Set common compile options
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
 
-# Specific settings for Debug build
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
-
-# Detect CPU architecture
-message(STATUS "Current CPU architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-
-# Specific settings for Release build
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|aarch64|ARM|AARCH64)")
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    # 64-bit ARM optimizations (e.g., RK3588 and Jetson Orin NX)
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mcpu=native -mtune=native -ffast-math")
-    message(STATUS "Using 64-bit ARM optimizations: -O3 -mcpu=native -mtune=native -ffast-math")
-  else()
-    # 32-bit ARM optimizations with NEON support
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mcpu=native -mtune=native -mfpu=neon -ffast-math")
-    message(STATUS "Using 32-bit ARM optimizations: -O3 -mcpu=native -mtune=native -mfpu=neon -ffast-math")
-  endif()
-  add_definitions(-DARM_ARCH)
-else()
-  # x86-64 (Intel/AMD) optimizations
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -mtune=native -funroll-loops") #-flto
-  message(STATUS "Using general x86 optimizations: -O3 -march=native -mtune=native -funroll-loops") 
-  add_definitions(-DX86_ARCH)
+if("$ENV{ROS_DISTRO}" STRLESS "iron")
+  add_compile_definitions(PRE_ROS_IRON)
 endif()
 
-# Define project root directory
-add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
+add_compile_definitions(ROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 
-# Detect CPU core count for potential multithreading optimization
 include(ProcessorCount)
 ProcessorCount(N)
-message(STATUS "Processor count: ${N}")
-
-# Set the number of cores for multithreading
 if(N GREATER 4)
-  math(EXPR PROC_NUM "4")
-  add_definitions(-DMP_EN -DMP_PROC_NUM=${PROC_NUM})
-  message(STATUS "Multithreading enabled. Cores: ${PROC_NUM}")
+  add_compile_definitions(MP_EN MP_PROC_NUM=4)
 elseif(N GREATER 1)
-  math(EXPR PROC_NUM "${N}")
-  add_definitions(-DMP_EN -DMP_PROC_NUM=${PROC_NUM})
-  message(STATUS "Multithreading enabled. Cores: ${PROC_NUM}")
+  add_compile_definitions(MP_EN MP_PROC_NUM=${N})
 else()
-  add_definitions(-DMP_PROC_NUM=1)
-  message(STATUS "Single core detected. Multithreading disabled.")
+  add_compile_definitions(MP_PROC_NUM=1)
 endif()
 
-# Check for OpenMP support
-find_package(OpenMP QUIET)
-if(OpenMP_CXX_FOUND)
-  message(STATUS "OpenMP found")
-  add_compile_options(${OpenMP_CXX_FLAGS})
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|aarch64|ARM|AARCH64)")
+  add_compile_definitions(ARM_ARCH)
 else()
-  message(STATUS "OpenMP not found, proceeding without it")
+  add_compile_definitions(X86_ARCH)
 endif()
 
-# Check for mimalloc support
-find_package(mimalloc QUIET)
-if(mimalloc_FOUND)
-  message(STATUS "mimalloc found")
-else()
-  message(STATUS "mimalloc not found, proceeding without it")
-endif()
-
-# Find catkin and required dependencies
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  nav_msgs
-  sensor_msgs
-  roscpp
-  rospy
-  std_msgs
-  pcl_ros
-  tf
-  message_generation
-  eigen_conversions
-  vikit_common
-  vikit_ros
-  cv_bridge
-  image_transport
-)
-
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(rcpputils REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(Sophus REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
+find_package(OpenMP QUIET)
 
-set(Sophus_LIBRARIES libSophus.so)
-
-# Define the catkin package
-catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime cv_bridge vikit_common vikit_ros image_transport
-  DEPENDS EIGEN3 PCL OpenCV Sophus
+set(FAST_LIVO_DEPS
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+  visualization_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  cv_bridge
+  pcl_conversions
+  rcpputils
 )
 
-# Include directories for dependencies
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
+set(FAST_LIVO_INCLUDE_DIRS
+  include
+  thirdparty/Sophus
+  thirdparty/rpg_vikit/vikit_common/include
+  ${EIGEN3_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
-  ${Sophus_INCLUDE_DIRS}
-  include
 )
 
-# Add libraries
+add_definitions(${PCL_DEFINITIONS})
+
+add_library(sophus_vendor STATIC
+  thirdparty/Sophus/sophus/so2.cpp
+  thirdparty/Sophus/sophus/so3.cpp
+  thirdparty/Sophus/sophus/se2.cpp
+  thirdparty/Sophus/sophus/se3.cpp
+  thirdparty/Sophus/sophus/scso3.cpp
+  thirdparty/Sophus/sophus/sim3.cpp
+)
+target_include_directories(sophus_vendor PUBLIC
+  thirdparty/Sophus
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+add_library(vikit_common_vendor STATIC
+  thirdparty/rpg_vikit/vikit_common/src/atan_camera.cpp
+  thirdparty/rpg_vikit/vikit_common/src/omni_camera.cpp
+  thirdparty/rpg_vikit/vikit_common/src/math_utils.cpp
+  thirdparty/rpg_vikit/vikit_common/src/vision.cpp
+  thirdparty/rpg_vikit/vikit_common/src/robust_cost.cpp
+  thirdparty/rpg_vikit/vikit_common/src/pinhole_camera.cpp
+  thirdparty/rpg_vikit/vikit_common/src/equidistant_camera.cpp
+  thirdparty/rpg_vikit/vikit_common/src/polynomial_camera.cpp
+)
+target_include_directories(vikit_common_vendor PUBLIC
+  thirdparty/rpg_vikit/vikit_common/include
+  thirdparty/Sophus
+  ${EIGEN3_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(vikit_common_vendor PUBLIC
+  sophus_vendor
+  ${OpenCV_LIBRARIES}
+)
+
+add_library(utils src/utils.cpp)
 add_library(vio src/vio.cpp src/frame.cpp src/visual_point.cpp)
 add_library(lio src/voxel_map.cpp)
 add_library(pre src/preprocess.cpp)
 add_library(imu_proc src/IMU_Processing.cpp)
 add_library(laser_mapping src/LIVMapper.cpp)
 
-# Add the main executable
-add_executable(fastlivo_mapping src/main.cpp)
+function(configure_fast_livo_target target)
+  target_include_directories(${target} PUBLIC ${FAST_LIVO_INCLUDE_DIRS})
+  ament_target_dependencies(${target} ${FAST_LIVO_DEPS})
+  target_link_libraries(${target} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+  if(OpenMP_CXX_FOUND)
+    target_link_libraries(${target} OpenMP::OpenMP_CXX)
+  endif()
+endfunction()
 
-# Link libraries to the executable
+configure_fast_livo_target(utils)
+configure_fast_livo_target(vio)
+configure_fast_livo_target(lio)
+configure_fast_livo_target(pre)
+configure_fast_livo_target(imu_proc)
+configure_fast_livo_target(laser_mapping)
+
+target_link_libraries(vio vikit_common_vendor sophus_vendor)
+target_link_libraries(lio utils)
+target_link_libraries(laser_mapping vio lio pre imu_proc utils vikit_common_vendor sophus_vendor)
+
+add_executable(fastlivo_mapping src/main.cpp)
+configure_fast_livo_target(fastlivo_mapping)
 target_link_libraries(fastlivo_mapping
   laser_mapping
   vio
   lio
   pre
   imu_proc
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${Sophus_LIBRARIES}
+  utils
+  vikit_common_vendor
+  sophus_vendor
   ${Boost_LIBRARIES}
 )
 
-# Link mimalloc if found
-if(mimalloc_FOUND)
-  target_link_libraries(fastlivo_mapping mimalloc)
-endif()
+install(TARGETS
+  fastlivo_mapping
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  config
+  launch
+  rviz_cfg
+  DESTINATION share/${PROJECT_NAME}
+)
+
+ament_package()

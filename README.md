@@ -95,9 +95,42 @@ catkin_make
 source ~/catkin_ws/devel/setup.bash
 ```
 
+## 3.1 ROS2 (Humble) Port Notes
+
+This repository now contains a ROS2 build path for `fast_livo` with vendored third-party dependencies:
+
+- `thirdparty/Sophus` (old API branch compatible with FAST-LIVO2 code path)
+- `thirdparty/rpg_vikit` (`vikit_common` sources linked locally)
+
+No system-wide `Sophus` or `vikit` installation is required for the ROS2 build.
+
+Build inside your ROS2 workspace:
+
+```bash
+cd /home/usrg/nif
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select fast_livo
+source install/setup.bash
+```
+
+IAC front-lidar ROS2 params:
+
+- Primary (front-left camera):  
+  - `config/iac_front_lidar_front_left_ros2.yaml`  
+  - launch: `launch/mapping_iac_front_left_ros2.launch.py`
+- Backup (fisheye-front camera, kept for later use):  
+  - `config/iac_front_lidar_fisheye_ros2.yaml`  
+  - launch: `launch/mapping_iac_fisheye_ros2.launch.py`
+
+Example run (front-left):
+
+```bash
+ros2 launch fast_livo mapping_iac_front_left_ros2.launch.py
+```
+
 ## 4. Run our examples
 
-Download FAST-LIVO2-Dataset from [Global-LVBA](https://github.com/xuankuzcr/Global-LVBA) Section IV.
+Download our collected rosbag files via OneDrive ([**FAST-LIVO2-Dataset**](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/zhengcr_connect_hku_hk/ErdFNQtjMxZOorYKDTtK4ugBkogXfq1OfDm90GECouuIQA?e=KngY9Z)). 
 
 ```
 roslaunch fast_livo mapping_avia.launch
