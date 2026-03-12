@@ -1,0 +1,6 @@
+[submodule "thirdparty/Sophus"]
+	path = thirdparty/Sophus
+	url = https://github.com/strasdat/Sophus.git
+[submodule "thirdparty/rpg_vikit"]
+	path = thirdparty/rpg_vikit
+	url = https://github.com/uzh-rpg/rpg_vikit.git
